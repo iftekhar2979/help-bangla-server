@@ -72,6 +72,7 @@ async function run() {
     const eventCollection = client.db('voleentiar-events').collection('events');
     const userCollection = client.db('voleentiar-events').collection('users');
     const registeredCollection = client.db('voleentiar-events').collection('registeredUser');
+    const totalUsers = client.db('voleentiar-events').collection('totalUsers');
     const imgCollection = client.db('test').collection('images');
     app.post('/addEvents', varifyJwt, async (req, res) => {
     
@@ -103,14 +104,12 @@ async function run() {
       const Searchlocation = req.query.location
       let query = {};
       if (Searchlocation) {
-        query = { location: Searchlocation };
+        query.location = {$regex:Searchlocation,$options:"i"}
         
       }
       console.log(query)
-      const findingLocation = await eventCollection.findOne(query);
-      // console.log(findingLocation)
-      
-      res.send(findingLocation);
+      const findingLocation =await eventCollection.findOne({ location: { $regex: 'dhaka', $options: 'i' } });  
+      res.status(200).send(findingLocation)
     });
     app.post('/signup', (req, res) => {
         const user = req.body
@@ -145,6 +144,41 @@ async function run() {
       result.map(item=>delete item.password) 
       // console.log(mapped)
            res.send(result)
+
+    })
+    app.post('/totalUsers',varifyJwt,async(req,res)=>{
+      const userInfo=req.body
+      const postEvent = await totalUsers.insertOne(userInfo);
+      res.send({update:true,postEvent})
+    })
+    app.get('/totalUsers',async(req,res)=>{
+      const postEvent = await totalUsers.find({});
+      const result=await postEvent.toArray()
+      res.send(result)
+    })
+    app.put('/totalUser/admin',async(req,res)=>{
+      const query=req.query
+      
+      const findAdmin= await totalUsers.findOne(query)
+      // console.log(findAdmin)
+      const option={upsert:true}
+      const updatingUser={
+        $set:{
+          name:findAdmin.name,
+          email:findAdmin.email,
+          role:"admin"
+        }
+      }
+      const result=await totalUsers.updateOne(query,updatingUser,option)
+      res.send(result)
+
+    })
+    app.get('/findAdmin',async(req,res)=>{
+      const query=req.query
+      console.log(query)
+      const findAdmin= await totalUsers.findOne(query)
+      console.log({isAdmin:findAdmin?.role==='admin'})
+      res.send({isAdmin:findAdmin?.role==='admin'})
 
     })
     app.patch('/userUpdate',async(req,res)=>{
@@ -232,7 +266,6 @@ async function run() {
     });
 
     app.post('/upload', upload.single('image'), (req, res) => {
-      // console.log(req.file);
       const file = new File({
         name: req.file.originalname,
         data: req.file.buffer,
